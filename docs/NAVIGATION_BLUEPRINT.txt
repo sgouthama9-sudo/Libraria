@@ -1,0 +1,218 @@
+
+================================================================================
+LIBRARIA — NAVIGATION BLUEPRINT
+================================================================================
+Read this first. It maps EVERY feature in the UI to:
+  - the HTML file that shows it
+  - the JS function that runs it
+  - the Supabase table(s) it reads/writes
+  - the storage bucket(s) it uses
+So you (or any backend dev) can extend / migrate this without guessing.
+
+================================================================================
+1. FILE MAP
+================================================================================
+index.html         → auth (login / signup / google)         → js/auth.js
+home.html          → search books, recommendations          → js/books.js
+                                                              initHomePage()
+book.html          → book details, borrow QR, reviews       → js/books.js
+                                                              initBookPage()
+profile.html       → my profile + my QR + photo upload      → js/borrow.js
+                                                              initProfilePage()
+borrowings.html    → active/history/fines (student view)    → js/borrow.js
+                                                              initBorrowingsPage()
+admin.html         → analytics, borrowings, add book,       → js/admin.js
+                     students, QR scan                        initAdminPage()
+
+Shared:
+  js/supabase-client.js  — Supabase URL/key + buckets
+  js/app.js              — toast, requireAuth, sidebar, uploadImage, etc.
+  css/styles.css         — all CSS, soft-cream palette
+
+================================================================================
+2. FEATURE → CODE → TABLE MAP
+================================================================================
+
+[A] LOGIN with email/password
+    UI : index.html  #form-login
+    JS : auth.js  → sb.auth.signInWithPassword({email,password})
+    DB : auth.users   (managed by Supabase)
+
+[B] SIGN UP
+    UI : index.html  #form-signup
+    JS : auth.js  → sb.auth.signUp(...) + sb.from("profiles").upsert(...)
+    DB : auth.users + profiles
+
+[C] GOOGLE SIGN-IN
+    UI : index.html  #btn-google
+    JS : auth.js  → sb.auth.signInWithOAuth({provider:"google"})
+    DB : auth.users  (profile row auto-created by trigger handle_new_user)
+
+[D] SEARCH BOOKS with domain filter
+    UI : home.html  #search-input  #filter-domain
+    JS : books.js  loadBooks(query, domain)
+    DB : books  (SELECT with ilike + eq domain)
+
+[E] RECOMMENDED BOOKS sidebar
+    UI : home.html  #recommend-list
+    JS : books.js  inside initHomePage()
+    DB : books  (top 5)
+
+[F] BOOK DETAILS PAGE
+    UI : book.html  #book-detail
+    JS : books.js  initBookPage()
+    DB : books (one row) + borrowings (count) + reviews
+
+[G] BORROW BOOK (student presses "Borrow")
+    UI : book.html  #btn-borrow → opens #qr-modal
+    JS : books.js  generateBorrowQR(book)
+    DB : INSERT into borrow_requests (book_id, user_id, unique_code, status='pending')
+    Output: QR encoding { code, book_id, book_title, user_id, user_name, student_id }
+
+[H] ADMIN SCANS BORROW QR → APPROVE
+    UI : admin.html  Scan QR tab  #qr-reader
+    JS : admin.js  setupScanner() → onScanSuccess() → approveBorrow()
+    DB : SELECT borrow_requests WHERE unique_code=...
+         INSERT into borrowings (book_id, user_id, due_date)
+         UPDATE borrow_requests SET status='approved'
+         RPC decrement_available(book_id_in)
+
+[I] WRITE A REVIEW
+    UI : book.html  #btn-review → #review-modal
+    JS : books.js  openReviewModal(bookId)
+    DB : INSERT into reviews (book_id, user_id, rating, comment)
+
+[J] MY ACTIVE BORROWINGS
+    UI : borrowings.html  tab "Active"
+    JS : borrow.js  loadActive()
+    DB : borrowings WHERE user_id=me AND returned_at IS NULL
+
+[K] MY HISTORY
+    UI : borrowings.html  tab "History"
+    JS : borrow.js  loadHistory()
+    DB : borrowings WHERE user_id=me AND returned_at IS NOT NULL
+
+[L] FINES + PAYMENTS
+    UI : borrowings.html  tab "Fines"
+    JS : borrow.js  loadFines() / payFine(id)
+    DB : SELECT fines + UPDATE fines SET paid=true
+    NB : Replace payFine with real payment gateway (Stripe / Razorpay) when ready.
+
+[M] MY PROFILE (view + edit)
+    UI : profile.html  #form-profile
+    JS : borrow.js  initProfilePage()
+    DB : UPDATE profiles WHERE id=me
+    Storage: student-photos  (upload avatar)
+
+[N] MY STUDENT QR
+    UI : profile.html  #profile-qr
+    JS : borrow.js  inside initProfilePage()
+    QR encodes: { type:"student", user_id, student_id }
+
+[O] ADMIN ANALYTICS
+    UI : admin.html  Analytics tab
+    JS : admin.js  loadAnalytics()
+    DB : count(books), count(profiles), count(borrowings active), count(borrow_requests pending)
+         SELECT recent 8 borrowings
+
+[P] ADMIN BOOK BORROWINGS LIST
+    UI : admin.html  Borrowings tab
+    JS : admin.js  loadAllBorrowings() + markReturned()
+    DB : SELECT borrowings + profiles + books   (filterable client-side)
+         UPDATE borrowings SET returned_at=now()
+         INSERT fines if overdue
+         RPC increment_available
+
+[Q] ADMIN ADD BOOK
+    UI : admin.html  Add book tab
+    JS : admin.js  inside initAdminPage()
+    DB : INSERT into books (...)
+    Storage: book-covers  (upload book cover image)
+
+[R] ADMIN STUDENT LIST  (find + inspect students, grant/revoke admin)
+    UI : admin.html  Students tab
+    JS : admin.js  loadStudents() / toggleAdmin()
+    DB : SELECT profiles / UPDATE profiles SET is_admin=...
+
+[S] ADMIN SCAN PROFILE QR  (find student instantly)
+    UI : admin.html  Scan QR tab
+    JS : admin.js  onScanSuccess() — payload.type === "student"
+    DB : SELECT profiles WHERE id = payload.user_id
+
+================================================================================
+3. DATABASE TABLES (full detail in docs/schema.sql)
+================================================================================
+profiles         id (uuid, FK auth.users), full_name, email, student_id,
+                 department, avatar_url, is_admin, created_at
+
+books            id (uuid), title, author, domain, shelf_location, description,
+                 cover_url, total_copies, available_copies, avg_rating,
+                 created_at
+
+borrow_requests  id (uuid), book_id (FK), user_id (FK), unique_code,
+                 status ('pending'/'approved'/'rejected'), created_at
+                 [the QR code points to this row via unique_code]
+
+borrowings       id (uuid), book_id (FK), user_id (FK), borrowed_at,
+                 due_date, returned_at
+
+fines            id (uuid), borrowing_id (FK), user_id (FK), amount,
+                 paid, paid_at, created_at
+
+reviews          id (uuid), book_id (FK), user_id (FK), rating (1-5),
+                 comment, created_at
+
+================================================================================
+4. STORAGE BUCKETS
+================================================================================
+book-covers      public read; uploaded by admin from admin.html → Add book
+                 returned URL goes into books.cover_url
+
+student-photos   public read; uploaded by student from profile.html
+                 returned URL goes into profiles.avatar_url
+
+================================================================================
+5. ROW-LEVEL SECURITY POLICIES (see schema.sql)
+================================================================================
+- A user can SELECT/UPDATE only their own profiles row.
+- Admins can SELECT/UPDATE every profiles row.
+- Anyone authenticated can SELECT books, reviews.
+- Only admins can INSERT/UPDATE/DELETE books.
+- A user can INSERT a borrow_request / review for themselves.
+- A user can SELECT only their own borrowings + fines.
+- Admins can SELECT every borrowing + fine, and INSERT/UPDATE them.
+
+================================================================================
+6. HOW TO TURN FRONTEND ACTIONS INTO RAW SQL
+================================================================================
+Every Supabase JS call → equivalent SQL:
+
+  sb.from("books").select("*")
+    -> select * from books;
+
+  sb.from("books").select("*").eq("domain","History")
+    -> select * from books where domain = 'History';
+
+  sb.from("profiles").update({is_admin:true}).eq("id",X)
+    -> update profiles set is_admin=true where id='X';
+
+  sb.from("borrowings").insert({...})
+    -> insert into borrowings (...) values (...);
+
+  sb.rpc("decrement_available",{book_id_in:X})
+    -> select decrement_available('X');
+
+You can see the actual SQL fired in Supabase → Logs → Postgres.
+
+================================================================================
+7. EXTENDING THE APP — quick recipes
+================================================================================
+- Add a new column to books? -> add it in schema.sql, then edit admin.js form
+  + books.js renderer.
+- Add a new role e.g. librarian? -> add `role` column to profiles + adjust the
+  RLS policies that currently check is_admin.
+- Switch from Supabase to your own FastAPI/Express? -> replace every
+  `sb.from(...)` call with `fetch("/api/...")`. The file map above tells you
+  exactly which endpoints you need.
+================================================================================
+

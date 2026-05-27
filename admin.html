@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Libraria — Admin</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/analytics.css" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-slot"></div>
+
+  <main class="main">
+    <h1 class="mb-4">Admin dashboard</h1>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tab-analytics">Analytics</button>
+      <button class="tab-btn"        data-tab="tab-borrowings">Book borrowings</button>
+      <button class="tab-btn"        data-tab="tab-books">Manage books</button>
+      <button class="tab-btn"        data-tab="tab-add-book">Add / Edit book</button>
+      <button class="tab-btn"        data-tab="tab-notices">Notices</button>
+      <button class="tab-btn"        data-tab="tab-students">Students</button>
+      <button class="tab-btn"        data-tab="tab-scan">Scan QR</button>
+    </div>
+
+    <!-- ══════════════════════ ANALYTICS TAB ══════════════════════════════ -->
+    <div id="tab-analytics" class="tab-content active">
+
+      <!-- Engine status badge -->
+      <div id="r-loading-badge" class="engine-loading-badge" style="display:none">
+        <div class="spinner-sm"></div>
+        <span>Running R &amp; Python analytics…</span>
+      </div>
+
+      <!-- KPI cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="label">Total books</div>
+          <div class="value" id="stat-books">0</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="label">Students</div>
+          <div class="value" id="stat-students">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Active borrowings</div>
+          <div class="value" id="stat-active">0</div>
+        </div>
+        <div class="stat-card taupe">
+          <div class="label">Pending requests</div>
+          <div class="value" id="stat-pending">0</div>
+        </div>
+      </div>
+
+      <!-- Row 1: Trend + Status -->
+      <div class="panel grid-2 mt-4">
+        <div>
+          <div class="chart-header">
+            <h2>Weekly borrow trend</h2>
+            <div id="trend-badge" class="trend-badge"></div>
+          </div>
+          <div class="r-engine-tag">📊 R · analytics.R → borrow_trend() · lm()</div>
+          <canvas id="trend-chart" height="200"></canvas>
+        </div>
+        <div>
+          <h2>Borrow status</h2>
+          <canvas id="status-chart" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 2: Domain polar + Top books -->
+      <div class="panel grid-2 mt-4">
+        <div>
+          <h2>Domain popularity</h2>
+          <div class="r-engine-tag">📊 R · analytics.R → domain_distribution()</div>
+          <canvas id="domain-chart" height="220"></canvas>
+        </div>
+        <div>
+          <h2>Top 5 borrowed books</h2>
+          <div class="r-engine-tag">📊 R · analytics.R → top_borrowed_books()</div>
+          <canvas id="top-books-chart" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 3: Correlation card -->
+      <div class="panel mt-4">
+        <h2>Availability vs demand correlation</h2>
+        <div class="r-engine-tag">📊 R · analytics.R → domain_correlation() · cor.test()</div>
+        <div id="corr-badge" class="mt-3"></div>
+      </div>
+
+      <!-- Row 4: Fine analytics -->
+      <div class="panel mt-4">
+        <h2>Fine analytics</h2>
+        <div class="r-engine-tag">📊 R · analytics.R → fine_stats() · mean / median / sd / IQR</div>
+        <div id="fine-total-badge" class="fine-total-badge mt-2"></div>
+        <canvas id="fine-chart" height="140"></canvas>
+      </div>
+
+      <!-- Row 5: Overdue risk -->
+      <div class="panel mt-4">
+        <h2>Overdue risk scoring</h2>
+        <div class="r-engine-tag">📊 R · analytics.R → overdue_risk() · logistic sigmoid</div>
+        <div id="overdue-risk-table" class="mt-3"></div>
+      </div>
+
+      <!-- Row 6: Python recommendations -->
+      <div class="panel mt-4">
+        <div class="chart-header">
+          <h2>Book recommendations</h2>
+          <span class="py-engine-tag">🐍 Python · Pyodide · TF-IDF + collaborative filtering</span>
+        </div>
+        <p class="text-soft mb-3" style="font-size:.9rem">
+          Per-student recommendations using hybrid Python ML — content-based TF-IDF
+          cosine similarity combined with domain collaborative filtering.
+        </p>
+        <div id="recommendations-panel"></div>
+      </div>
+
+      <!-- Row 7: Recent activity -->
+      <div class="panel mt-4">
+        <h2>Recent activity</h2>
+        <div id="recent-activity" class="review-list mt-4"></div>
+      </div>
+
+    </div><!-- /tab-analytics -->
+
+    <!-- ══════════════════════ BORROWINGS TAB ══════════════════════════════ -->
+    <div id="tab-borrowings" class="tab-content">
+      <div class="search-bar mb-4">
+        <i data-lucide="search" style="width:18px;height:18px;color:var(--text-soft)"></i>
+        <input type="text" id="borrow-filter" placeholder="Filter by student, ID or book…" />
+      </div>
+      <div id="all-borrowings-list"></div>
+    </div>
+
+    <!-- ══════════════════════ ADD / EDIT BOOK TAB ═════════════════════════ -->
+    <div id="tab-add-book" class="tab-content">
+      <div class="panel" style="max-width:720px">
+        <h2>Add or edit a book</h2>
+        <form id="form-add-book" class="mt-4">
+          <input type="hidden" id="book-id-input" />
+          <div class="form-group">
+            <label>Cover image</label>
+            <label for="book-cover-input" class="upload-zone">
+              <input type="file" id="book-cover-input" accept="image/*" />
+              <i data-lucide="upload" style="width:20px;height:20px;color:var(--text-soft)"></i>
+              <p class="text-soft mt-2">Click to upload book cover</p>
+              <img id="book-cover-preview" class="upload-preview hidden" alt="" />
+            </label>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" id="book-title-input" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label>Author</label>
+              <input type="text" id="book-author-input" class="form-control" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Domain</label>
+              <select id="book-domain" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label>Shelf location</label>
+              <input type="text" id="book-shelf-input" class="form-control" placeholder="e.g. A3-Shelf-12" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Total copies</label>
+              <input type="number" id="book-total-input" class="form-control" min="1" value="1" />
+            </div>
+            <div class="form-group">
+              <label>Available copies</label>
+              <input type="number" id="book-available-input" class="form-control" min="0" value="1" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>E-book link</label>
+            <input type="url" id="book-ebook-input" class="form-control" placeholder="https://…" />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="book-desc-input" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn btn-primary" id="btn-add-book">Save book</button>
+            <button type="button" class="btn btn-outline" id="btn-reset-book">Reset</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ MANAGE BOOKS TAB ════════════════════════════ -->
+    <div id="tab-books" class="tab-content">
+      <div class="panel">
+        <h2>Library books</h2>
+        <div id="books-admin-list"></div>
+      </div>
+    </div>
+
+    <!-- Requests modal -->
+    <div id="book-requests-modal" class="modal" style="display:none">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>Pending requests</h3>
+          <button id="book-requests-close" class="btn btn-sm btn-outline">Close</button>
+        </div>
+        <div id="book-requests-body" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ NOTICES TAB ════════════════════════════════ -->
+    <div id="tab-notices" class="tab-content">
+      <div class="panel" style="max-width:720px">
+        <h2>Manage notices</h2>
+        <form id="form-notice" class="mt-4">
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="notice-title-input" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Message</label>
+            <textarea id="notice-message-input" class="form-control" rows="4" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Publish notice</button>
+        </form>
+        <div class="mt-4">
+          <h3>Current notices</h3>
+          <div id="notice-admin-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ STUDENTS TAB ═══════════════════════════════ -->
+    <div id="tab-students" class="tab-content">
+      <div class="search-bar mb-4">
+        <i data-lucide="search" style="width:18px;height:18px;color:var(--text-soft)"></i>
+        <input type="text" id="student-filter" placeholder="Filter by name or student ID…" />
+      </div>
+      <div id="students-list"></div>
+    </div>
+
+    <!-- ══════════════════════ SCAN QR TAB ════════════════════════════════ -->
+    <div id="tab-scan" class="tab-content">
+      <div class="panel" style="max-width:640px">
+        <h2>Scan a QR code</h2>
+        <p class="text-soft mb-4">
+          Scan a student's borrow QR to confirm a borrow, or a profile QR to view details.
+        </p>
+        <div id="qr-reader"></div>
+        <div class="actions-row mt-4">
+          <button id="scan-start" class="btn btn-primary">Start scanner</button>
+          <button id="scan-stop"  class="btn btn-outline">Stop</button>
+        </div>
+      </div>
+      <div id="scan-result" class="mt-6"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Core dependencies ──────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- ── WebR: R compiled to WebAssembly (Tier 2 fallback) ─────────────────── -->
+<script type="module">
+  import { WebR } from "https://webr.r-wasm.org/latest/webr.mjs";
+  window.WebR = { WebR };
+</script>
+
+<!-- ── Pyodide: Python compiled to WebAssembly ────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js"></script>
+
+<!-- ── Libraria app scripts ───────────────────────────────────────────────── -->
+<script src="js/supabase-client.js"></script>
+<script src="js/app.js"></script>
+
+<!-- R bridge: connects to r/analytics.R via r/plumber_api.R REST API,
+     WebR (Tier 2), or JS fallback (Tier 3) -->
+<script src="js/analytics-r.js"></script>
+
+<!-- Python recommendations: Pyodide TF-IDF + collaborative filtering -->
+<script src="js/recommendations-py.js"></script>
+
+<!-- Dashboard renderer: consumes R + Python outputs, draws all charts -->
+<script src="js/analytics-dashboard.js"></script>
+
+<!-- Admin page controller -->
+<script src="js/admin.js"></script>
+<script>initAdminPage();</script>
+</body>
+</html>

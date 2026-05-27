@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Libraria — Profile</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-slot"></div>
+
+    <main class="main">
+      <h1 class="mb-4">My profile</h1>
+
+      <div class="content-grid">
+        <section class="panel">
+          <h2>Personal information</h2>
+          <form id="form-profile" class="mt-4" data-testid="form-profile">
+            <div class="form-group">
+              <label>Profile picture</label>
+              <label for="avatar-input" class="upload-zone" data-testid="upload-avatar">
+                <input type="file" id="avatar-input" accept="image/*" />
+                <i data-lucide="upload" style="width:20px;height:20px;color:var(--text-soft);"></i>
+                <p class="text-soft mt-2">Click to upload student photo</p>
+                <img id="avatar-preview" class="upload-preview hidden" alt="" />
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Full name</label>
+              <input type="text" id="p-name" class="form-control" data-testid="p-name" required />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="p-email" class="form-control" data-testid="p-email" disabled />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Department</label>
+                <input type="text" id="p-dept" class="form-control" data-testid="p-dept" />
+              </div>
+              <div class="form-group">
+                <label>Student ID</label>
+                <input type="text" id="p-sid" class="form-control" data-testid="p-sid" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" data-testid="btn-save-profile">Save changes</button>
+          </form>
+        </section>
+
+        <aside class="panel" style="height:fit-content;">
+          <h2>Your QR code</h2>
+          <p class="text-soft mb-4" style="font-size:0.85rem;">An admin can scan this to view your profile.</p>
+          <div class="qr-display">
+            <div id="profile-qr" data-testid="profile-qr"></div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="panel mt-6">
+        <h2>My borrow requests</h2>
+        <div id="my-requests-list" class="mt-4">
+          <p class="text-soft">Loading your requests…</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/borrow.js"></script>
+  <script>initProfilePage();</script>
+</body>
+</html>
