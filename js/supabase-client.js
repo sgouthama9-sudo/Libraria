@@ -8,9 +8,13 @@
    See docs/SUPABASE_SETUP.md for full instructions.
    ===================================================== */
 
-const SUPABASE_URL  = "https://ilmrgsazohenxpjcxwkw.supabase.co";   // e.g. https://abcd1234.supabase.co
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsbXJnc2F6b2hlbnhwamN4d2t3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3Mzc0MzMsImV4cCI6MjA5NDMxMzQzM30.9NTOsUCLt6Kr7du9kkNbNh4aZOIS0i6cCRu2q4N4Sr0";      // long JWT-like string
-
+const SUPABASE_URL  = "https://wzwfstvmnporxtvnvwos.supabase.co";   // Replace with your Supabase project URL
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6d2ZzdHZtbnBvcnh0dm52d29zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NjIxNjUsImV4cCI6MjA5NzMzODE2NX0.AX1cAWm1T6PsIMER8NPAy2e4FGV74LAEGnM-WW3ZHAY";
+if (SUPABASE_URL.includes("<your-project-ref>") || SUPABASE_ANON.includes("<your-anon-key>")) {
+  console.error(
+    "Supabase is not configured. Open js/supabase-client.js and paste your Project URL and anon public key from Supabase Dashboard."
+  );
+}
 // Loaded from CDN in every HTML page:
 //   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);

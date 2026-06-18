@@ -2,8 +2,13 @@
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If already signed in, jump to home
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) { window.location.href = "home.html"; return; }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    console.log("Auth: current session:", session);
+    if (session) { window.location.href = "home.html"; return; }
+  } catch (err) {
+    console.error("Auth: getSession failed:", err);
+  }
 
   // Tabs (login / signup)
   document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -18,11 +23,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Google sign-in
   document.getElementById("btn-google")?.addEventListener("click", async () => {
     const redirectTo = `${window.location.origin}/home.html`;
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo }
-    });
-    if (error) toast(error.message, "error");
+    const resp = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+    console.log("Auth: signInWithOAuth response:", resp);
+    if (resp.error) toast(resp.error.message, "error");
   });
 
   // Email login
@@ -30,8 +33,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     e.preventDefault();
     const email = document.getElementById("login-email").value;
     const password = document.getElementById("login-password").value;
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { toast(error.message, "error"); return; }
+    const resp = await sb.auth.signInWithPassword({ email, password });
+    console.log("Auth: signInWithPassword response:", resp);
+    if (resp.error) { console.error("Auth login error:", resp.error); toast(resp.error.message, "error"); return; }
     window.location.href = "home.html";
   });
 
@@ -44,11 +48,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const department = document.getElementById("signup-department").value;
     const studentId  = document.getElementById("signup-student-id").value;
 
-    const { data, error } = await sb.auth.signUp({
+    const resp = await sb.auth.signUp({
       email, password,
       options: { data: { full_name: fullName, department, student_id: studentId } }
     });
-    if (error) { toast(error.message, "error"); return; }
+    console.log("Auth: signUp response:", resp);
+    const { data, error } = resp;
+    if (error) {
+      console.error("Auth signup error:", error);
+      // Show full error/response for debugging when message is empty or missing
+      const msg = error?.message || JSON.stringify(error) || JSON.stringify(resp);
+      toast(msg, "error");
+      return;
+    }
 
     // If signup returns an authenticated session, update the profile row.
     // If email verification is required, insert/update is skipped until the user signs in.
